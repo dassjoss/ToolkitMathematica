@@ -1,0 +1,26 @@
+
+# --- Wolfram / Mathematica ---
+*.nb~
+*.nb.bak
+*.wl.bak
+*.mx
+*.lock
+.WolframKernel/
+btl.log
+btl/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Sistema y Editores ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# --- Basura de Tests ---
+Tests/img/
+backups/

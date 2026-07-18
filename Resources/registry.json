@@ -1,0 +1,18 @@
+{
+  "tensors": {
+    "g": {"manifold": "M"},
+    "R": {"manifold": "M"},
+    "T": {"manifold": "M"},
+    "G": {"manifold": "M"},
+    "phi": {"manifold": "M"},
+    "e": {"manifold": "M", "wolfram": "Vb"}
+  },
+  "operators": {
+    "partial": "PD",
+    "nabla": "CD"
+  },
+  "constants": {
+    "pi": "Pi",
+    "G_grav": "Ggrav"
+  }
+}
