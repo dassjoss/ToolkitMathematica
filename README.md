@@ -14,5 +14,15 @@ Motor de alta velocidad para Wolfram Language y xAct. Permite definir tensores, 
 - `Resources/`: Bases de datos (registry.json, etc.).
 - `docs/`: Reglas de oro y convenciones (VER CONVENTIONS.md).
 
-## Estado del Proyecto
-Simplificado: Se ha pausado el OCR/Python para priorizar la estabilidad del motor en Mathematica.
+## 🛠 Control de Calidad e Integridad
+Para garantizar la estabilidad del motor (especialmente el renderizado visual), el proyecto utiliza un sistema de **Golden Snapshot Testing**.
+
+### Validación Visual (`GoldenVisual.wlt`)
+Debido a la complejidad de las estructuras `Boxes` de Mathematica, se utiliza un "Test de Oro" que compara el `InputForm` del renderizado actual contra una huella digital validada.
+
+**Para ejecutar los tests:**
+Desde una celda de Mathematica:
+```wolfram
+SetDirectory["Ruta/A/ToolkitModules"];
+Get["Source/Visual.wl"];
+TestReport["Tests/GoldenVisual.wlt"]
