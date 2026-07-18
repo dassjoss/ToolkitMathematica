@@ -1,5 +1,9 @@
 (* ::Package:: *)
 
+BeginPackage["TensorToolkit`", {"xAct`xTensor`"}];
+
+(* Declaraciones de funciones (Exportadas) *)
+
 GreekIndex::usage = "GreekIndex[idx] traduce un nombre de indice (string o simbolo) a su representacion griega/latina Unicode.";
 
 SetDisplayName::usage = "SetDisplayName[simbolo, \"etiqueta\"] define el alias visual de un tensor/constante (cosmetico, no afecta el calculo).";
@@ -20,7 +24,15 @@ CheckEinsteinNotation::usage = "CheckEinsteinNotation[expr] verifica que no haya
 
 ToLatexExport::usage = "ToLatexExport[expr] convierte la expresion a su representacion en LaTeX (version preliminar).";
 
+(* Símbolos compartidos con Core.wl *)
+
+$IndexRegistry::usage = "Registro global de indices compartido.";
+
+$GreekStringMap::usage = "Mapa de conversion de glifos griegos.";
+
 Begin["`Private`"]
+
+(* --- INICIO DE TU LÓGICA ORIGINAL (SIN CAMBIOS) --- *)
 
 TensorToolkit`$GreekStringMap = <|"mu" -> \[Mu], "nu" -> \[Nu], "rho"
    -> \[Rho], "sigma" -> \[Sigma], "si" -> \[Sigma], "tau" -> \[Tau], "alpha"
@@ -238,4 +250,8 @@ TensorToolkit`CleanVisual[expr_] :=
 ToLatexExport[expr_] :=
   ToString[TeXForm[expr]];
 
+(* --- FIN DE TU LÓGICA ORIGINAL --- *)
+
 End[]
+
+EndPackage[]
