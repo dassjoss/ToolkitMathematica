@@ -19,6 +19,7 @@ Print["[📦] Cargando Módulos..."];
 Quiet[
     Get["Source/Visual.wl"];
     Get["Source/Core.wl"];
+    Get["Source/Geometry.wl"];
     Needs["xAct`xTensor`"];
 ];
 
@@ -59,14 +60,33 @@ If[globalReport["AllTestsSucceeded"],
     Print["⚠️  RESULTADO: SE DETECTARON ERRORES."];
     Print["\nDetalle de fallos:"];
     Scan[
-        If[#["Outcome"] === "Failure" || #["Outcome"] === "MessagesFailure",
-            
-            Print["   [X] ", #["TestID"], " en ", FileNameTake[#["TestFileName"
-                ]]]
+        Module[{tr = #},
+            If[tr["Outcome"] === "Failure" || tr["Outcome"] === "MessagesFailure"
+                 || tr["Outcome"] === "Error",
+                Print["\n" <> StringRepeat["-", 40]];
+                Print["   [X] TestID:        ", tr["TestID"]];
+                Print["       Archivo:       ", FileNameTake[tr["TestFileName"
+                    ]]];
+                Print["       Outcome:       ", tr["Outcome"]];
+                Print["       Esperado:      ", tr["ExpectedOutput"]]
+                    ;
+                Print["       Obtenido:      ", tr["ActualOutput"]];
+                If[tr["ActualMessages"] =!= {},
+                    Print["       ⚠ Mensajes generados:"];
+                    Scan[Print["           - ", ToString[#, InputForm
+                        ]]&, tr["ActualMessages"]];
+                ];
+                If[tr["ExpectedMessages"] =!= {} && tr["ExpectedMessages"
+                    ] =!= tr["ActualMessages"],
+                    Print["       Mensajes esperados: ", tr["ExpectedMessages"
+                        ]];
+                ];
+            ];
         ]&
         ,
         Values[globalReport["TestResults"]]
     ];
+    Print["\n" <> StringRepeat["-", 40]];
 ];
 
 Print[StringRepeat["=", 40] <> "\n"];
