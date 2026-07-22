@@ -32,15 +32,16 @@ DefineLeviCivita[mfd_Symbol, eps_Symbol, tipo_String] :=
         eps = xAct`xTensor`epsilon[met];
         SetLeviCivitaFormatting[eps, tipo];
         $LeviCivitaRegistry[mfd] = eps;
-        ,
-        xAct`xTensor`DefTensor[eps @@ inds, mfd, Antisymmetric[Range[
-          dim]]];
+        If[!MemberQ[xAct`xTensor`$Tensors, eps],
+          xAct`xTensor`DefTensor[eps @@ inds, mfd, Antisymmetric[Range[dim]]]
+        ];
         SetLeviCivitaFormatting[eps, tipo];
         $LeviCivitaRegistry[mfd] = eps;
       ];
       ,
-      xAct`xTensor`DefTensor[eps @@ inds, mfd, Antisymmetric[Range[dim
-        ]], xAct`xTensor`WeightOfTensor -> 1];
+      If[!MemberQ[xAct`xTensor`$Tensors, eps],
+        xAct`xTensor`DefTensor[eps @@ inds, mfd, Antisymmetric[Range[dim]], xAct`xTensor`WeightOfTensor -> 1]
+      ];
       SetLeviCivitaFormatting[eps, tipo];
       $LeviCivitaRegistry[mfd] = eps;
     ];
@@ -94,17 +95,41 @@ SetLeviCivitaFormatting[eps_Symbol, tipo_String] :=
   ];
 
 EpsContract[expr_] :=
-  Module[{res, getSym},
+  Module[{res, getSym, getManifold, getMetric, signDet},
     getSym[Times[-1, s_Symbol]] := s;
     getSym[s_Symbol] := s;
     getSym[_] := Null;
-    res = expr /. eps1_Symbol[i1__] * eps2_Symbol[i2__] /; (StringMatchQ[SymbolName[
-      eps1], "*eps*"] || StringMatchQ[SymbolName[eps1], "*Eps*"] || StringMatchQ[
-      SymbolName[eps1], "*epsilon*"]) && eps1 === eps2 :> 
-       If[Sort[Map[getSym, {i1}]] === Sort[Map[getSym, {i2}]],
-           Factorial[Length[{i1}]],
-           xAct`xTensor`GDelta @@ Join[{i1}, {i2}]
-       ];
+    
+    getManifold[idx_] := Module[{sym = getSym[idx]},
+      If[sym === Null, Return[Null]];
+      Quiet[xAct`xTensor`BaseOfVBundle[
+        Quiet[xAct`xTensor`VBundleOfIndex[sym]]]]
+    ];
+    
+    getMetric[mfd_Symbol] := Module[{metrics},
+      metrics = xAct`xTensor`MetricsOfVBundle[xAct`xTensor`Tangent[mfd]];
+      If[Length[metrics] > 0, First[metrics], Null]
+    ];
+    
+    res = expr /. eps1_Symbol[i1__] * eps2_Symbol[i2__] /; 
+      (StringMatchQ[SymbolName[eps1], "*eps*"] || 
+       StringMatchQ[SymbolName[eps1], "*Eps*"] || 
+       StringMatchQ[SymbolName[eps1], "*epsilon*"]) && eps1 === eps2 :> 
+      Module[{n = Length[{i1}], mfd, met, signDet},
+        mfd = getManifold[{i1}[[1]]];
+        met = If[mfd =!= Null, getMetric[mfd], Null];
+        signDet = If[met =!= Null, 
+          xAct`xTensor`SignDetOfMetric[met], 
+          1
+        ];
+        If[Sort[Map[getSym, {i1}]] === Sort[Map[getSym, {i2}]],
+          signDet * Factorial[n],
+          If[signDet == -1 && n >= 2,
+            xAct`xTensor`Gdelta @@ ReplacePart[Join[{i1}, {i2}], {1 -> Join[{i1}, {i2}][[2]], 2 -> Join[{i1}, {i2}][[1]]}],
+            signDet * (xAct`xTensor`Gdelta @@ Join[{i1}, {i2}])
+          ]
+        ]
+      ];
     res
   ];
 
@@ -118,6 +143,10 @@ Unprotect[System`HodgeDual];
 
 ClearAll[System`HodgeDual];
 
+System`HodgeDual::noinds = "Se necesitan al menos `1` índices disponibles en `3`, pero solo hay `2`.";
+System`HodgeDual::toohigh = "La forma tiene `1` índices, pero la dimensión de `3` es solo `2`.";
+System`HodgeDual::nometric = "No se encontró métrica en el manifold `1`. El dual de Hodge requiere métrica.";
+
 System`HodgeDual[expr_, mfd_] :=
   Module[{eps, dim, freeInds, p, allMfdInds, newInds, epsInds, getSym,
      allFree, dummies, hodgeExpr, metrics, met, availableInds, unusedInds, contractInds, metricFactors},
@@ -128,97 +157,57 @@ System`HodgeDual[expr_, mfd_] :=
     dim = xAct`xTensor`DimOfManifold[mfd];
     metrics = xAct`xTensor`MetricsOfVBundle[xAct`xTensor`Tangent[mfd]];
     If[Length[metrics] == 0,
+      Message[System`HodgeDual::nometric, mfd];
       Return[expr]
     ];
     met = First[metrics];
-    getSym[Times[-1, s_]] := s;
-    getSym[s_] := s;
+    getSym[Times[-1, s_Symbol]] := s;
+    getSym[s_Symbol] := s;
     getSym[_] := Null;
-    allFree = {};
-    Cases[
-      {expr}
-      ,
-      head_[inds___] :>
-        Module[{mfdInds},
-          mfdInds =
-            Select[
-              {inds}
-              ,
-              (
-                Module[{sym = getSym[#]},
-                  sym =!= Null && Quiet[xAct`xTensor`BaseOfVBundle[Quiet[
-                    xAct`xTensor`VBundleOfIndex[sym]]]] === mfd
-                ]
-              )&
-            ];
-          If[Length[mfdInds] > Length[allFree],
-            allFree = mfdInds
-          ];
-        ]
-      ,
-      Infinity
-    ];
-    freeInds = allFree;
+    freeInds = Select[List @@ xAct`xTensor`FindFreeIndices[expr], 
+      Quiet[xAct`xTensor`BaseOfVBundle[Quiet[xAct`xTensor`VBundleOfIndex[getSym[#]]]]] === mfd &];
+    dummies = Select[List @@ xAct`xTensor`FindDummyIndices[expr], 
+      Quiet[xAct`xTensor`BaseOfVBundle[Quiet[xAct`xTensor`VBundleOfIndex[getSym[#]]]]] === mfd &];
     p = Length[freeInds];
+    allMfdInds = xAct`xTensor`IndicesOfVBundle[xAct`xTensor`Tangent[mfd]][[1]];
+    
     If[p == 0,
+      hodgeExpr = expr * (eps @@ Map[Minus, Take[allMfdInds, dim]]);
+      hodgeExpr = xAct`xTensor`ContractMetric[hodgeExpr];
+      hodgeExpr = xAct`xTensor`ToCanonical[hodgeExpr];
+      Return[hodgeExpr]
+    ];
+    
+    If[p > dim,
+      Message[System`HodgeDual::toohigh, p, dim, mfd];
       Return[expr]
     ];
-    allMfdInds = xAct`xTensor`IndicesOfVBundle[xAct`xTensor`Tangent[mfd
-      ]][[1]];
-    dummies = {};
-    Cases[
-      {expr}
-      ,
-      head_[inds___] :>
-        (
-          dummies =
-            Join[
-              dummies
-              ,
-              Select[
-                {inds}
-                ,
-                (
-                  Module[{sym = getSym[#]},
-                    sym =!= Null && Quiet[xAct`xTensor`BaseOfVBundle[
-                      Quiet[xAct`xTensor`VBundleOfIndex[sym]]]] === mfd
-                  ]
-                )&
-              ]
-            ]
-        )
-      ,
-      Infinity
-    ];
-    dummies = Tally[Map[getSym, dummies]];
-    dummies = Select[dummies, #[[2]] > 1&][[All, 1]];
     
-    availableInds = Select[allMfdInds, !MemberQ[Map[getSym, freeInds], #] && !MemberQ[dummies, #]&];
-    If[Length[availableInds] < dim,
-        Return[expr]
-    ];
-    unusedInds = Reverse[Take[Reverse[availableInds], dim]];
-    newInds = Take[unusedInds, dim - p];
-    contractInds = Drop[unusedInds, dim - p];
+    
+    Catch[
+      availableInds = Select[allMfdInds, !MemberQ[Map[getSym, freeInds], #] && !MemberQ[dummies, #]&];
+      If[Length[availableInds] < dim,
+          Message[System`HodgeDual::noinds, dim, Length[availableInds], mfd];
+          Return[expr]
+      ];
+      unusedInds = Reverse[Take[Reverse[availableInds], dim]];
+      newInds = Take[unusedInds, dim - p];
+      contractInds = Drop[unusedInds, dim - p];
 
-    epsInds = Join[Map[Minus, contractInds], Map[Minus, newInds]];
-    
-    metricFactors = Product[
-        If[TensorToolkit`IsDownIndex[freeInds[[i]]],
-            met[getSym[freeInds[[i]]], contractInds[[i]]]
-            ,
-            met[-getSym[freeInds[[i]]], contractInds[[i]]]
-        ],
+      epsInds = Join[Map[Minus, contractInds], Map[Minus, newInds]];
+      
+      metricFactors = Times @@ Table[
+        met[getSym[freeInds[[i]]], contractInds[[i]]]
+        ,
         {i, 1, p}
-    ];
+      ];
 
-    hodgeExpr = (1 / Factorial[p]) * expr * metricFactors * (eps @@ epsInds);
-    
-    hodgeExpr = xAct`xTensor`ContractMetric[hodgeExpr];
-    If[Length[Quiet[xAct`xTensor`FreeIndices[hodgeExpr]]] > 0,
-      hodgeExpr = xAct`xTensor`ToCanonical[hodgeExpr]
-    ];
-    hodgeExpr
+      hodgeExpr = (1 / Factorial[p]) * expr * metricFactors * (eps @@ epsInds);
+      hodgeExpr = xAct`xTensor`ContractMetric[hodgeExpr];
+      hodgeExpr = TensorToolkit`EpsContract[hodgeExpr];
+      hodgeExpr = xAct`xTensor`ToCanonical[hodgeExpr];
+      Return[hodgeExpr]
+    ]
       
   ];
 

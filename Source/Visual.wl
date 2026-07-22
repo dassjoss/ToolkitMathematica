@@ -205,10 +205,9 @@ SetTensorFormatting[t_Symbol] :=
         RawBoxes[TagBox[RowBox[blocks], "Tensor"]]
       ];
   ];
+SetDisplayName[xAct`xTensor`Gdelta, "\\[Delta]"];
 
-SetDisplayName[xAct`xTensor`GDelta, "\\[Delta]"];
-
-TensorToolkit`SetTensorFormatting[xAct`xTensor`GDelta];
+TensorToolkit`SetTensorFormatting[xAct`xTensor`Gdelta];
 
 CheckEinsteinNotation[expr_] :=
   Module[{checkTerm, badIndices = {}},
